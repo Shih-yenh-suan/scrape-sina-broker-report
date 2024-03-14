@@ -1,5 +1,7 @@
 # 爬取新浪财经券商研报
 
+从新浪财经的券商研报中爬取个股报告，并按月存入csv文件中。
+
 ## 网站
 
 https://stock.finance.sina.com.cn/stock/go.php/vReport_List/kind/search/index.phtml
@@ -10,15 +12,16 @@ https://stock.finance.sina.com.cn/stock/go.php/vReport_List/kind/search/index.ph
 
 ## 使用方式
 
-将 SAVING_PATH 修改为文件的保存路径
+1. 将 SAVING_PATH 修改为文件的保存路径
+2. 取消最后几行的注释
+3. *可选：*
 
-*可选：*
+   - start_date：定义爬取的开始日期（含）
 
-start_date：定义爬取的开始日期（含）
+   - end_date：定义爬取的结束日期（含）
 
-end_date：定义爬取的结束日期（含）
+   默认开始日期为2000年1月1日，结束日期为当前日期
 
-默认开始日期为2000年1月1日，结束日期为当前日期
 
 ## 问题和Todo
 
