@@ -8,13 +8,15 @@ https://stock.finance.sina.com.cn/stock/go.php/vReport_List/kind/search/index.ph
 
 ## 思路
 
-给出日期和页码，循环爬取网站，将对应内容保存到csv文件中，按月份分类
+1. 给出日期和页码，循环爬取网站，将对应内容保存到csv文件中，按月份分类。
+2. 由于网站反爬，经常遇到网页数据加载不出来的问题。故在所有查到页面无内容的情况下，将页面和对应日期保存到txt文件中。然后，通过 get_url_from_file 变量，设为1的时候，就重新爬取txt文件的内容。重新获取后，无论是否有内容，都删除这条记录
 
 ## 使用方式
 
 1. 将 SAVING_PATH 修改为文件的保存路径
 2. 取消最后几行的注释
-3. *可选：*
+3. 修改 get_url_from_file 参数，选择是从文件中获取 url 还是根据日期和页码获取。
+4. *可选：*
 
    - start_date：定义爬取的开始日期（含）
 
@@ -30,3 +32,4 @@ https://stock.finance.sina.com.cn/stock/go.php/vReport_List/kind/search/index.ph
    1. 可能遗漏其他个股研报，但目前没发现
    2. 完全可以实现对其他类型的爬取，但目前无需求，且未想到好的保存方法
 3. 有时候会抽风，明明页面还有内容，就显示没有了，会造成遗漏
+   1. 已解决：见思路2

@@ -12,47 +12,112 @@ HEADERS = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0',
 }
+SAVING_PATH = rf"E:\[待整理]Source_for_sale\券商研报"
+
+
+def scrape_page(URL, HEADERS):
+    """爬取代码封装"""
+    result = retry_on_failure(
+        lambda: requests.get(URL, headers=HEADERS).text)
+    time.sleep(random.uniform(1, 5))
+    parsed_html = etree.HTML(result)
+    return parsed_html
+
+
+def unpack_and_standarise_response(parsed_html):
+    """将返回的代码整理成需要的元素，并组成元组列表"""
+    # 处理超链接
+    file_url = parsed_html.xpath('//td[@class="tal f14"]/a/@href')
+    file_url = [f"https:{url}" for url in file_url]
+    # 处理标题
+    file_title = parsed_html.xpath('//td[@class="tal f14"]/a/@title')
+    # 报告类型，债券/行业/宏观/公司等等
+    file_type = parsed_html.xpath(
+        '//div[@class="main"]/table/tr/td[3]/text()')
+    # 处理机构
+    file_broker = parsed_html.xpath(
+        '//div[@class="main"]/table/tr/td[5]/a/div/span/text()')
+    # 处理研究员
+    file_researcher = parsed_html.xpath(
+        '//div[@class="main"]/table/tr/td[6]/div/span/text()')
+    file_info = [file_url, file_title, file_type,
+                 file_broker, file_researcher]
+    file_info = list(zip(*file_info))
+    return file_info
 
 
 class DateProcesser:
-    def __init__(self, reportDate):
+    def __init__(self, reportDate, records_txt):
         self.reportDate = reportDate
+        self.records_txt = records_txt
+
+    def process_url_from_files(self):
+        """从文件中获取URL，重新执行爬取"""
+        # 检查记录文件是否存在，不存在则创建
+        if not os.path.exists(self.records_txt):
+            with open(self.records_txt, 'w') as file:
+                pass
+        # 循环读取文件的第一行，以实现爬取一个删除一个。
+        while True:
+            with open(self.records_txt, 'r', encoding='utf-8', errors='ignore') as f:
+                records = f.readlines()
+            # 如果没有行，则跳出
+            if not records:
+                print(f"全部记录已重新爬取")
+                break
+            record = records[0]
+            url = record.split(',')[0]
+            reportDate = record.split(',')[1]
+            self.reportDate = reportDate
+            print(f"开始：{url}")
+            parsed_html = scrape_page(url, HEADERS)
+            file_info = unpack_and_standarise_response(parsed_html)
+            for files in file_info:
+                self.download_file(files)
+            # 处理完成后，从记录中移除当前URL，也就是不将当前URL加回去
+            with open(self.records_txt, 'w', encoding='utf-8', errors='ignore') as file:
+                file.writelines(records[1:])
+            print(f"已从记录中删除：{url}")
 
     def process_page_for_downloads(self, pageNum: int):
         """处理指定页码的公告信息并下载相关文件"""
         URL = f'https://stock.finance.sina.com.cn/stock/go.php/vReport_List/kind/search/index.phtml?t1=6&symbol=&p={pageNum}&pubdate={self.reportDate}'
         # 向网站获取内容和总页数，必须分开获取，否则容易报错
-        result = retry_on_failure(
-            lambda: requests.get(URL, headers=HEADERS).text)
-        time.sleep(random.uniform(5, 15))
-        print("==" * 10 + f"{self.reportDate} 日第 {pageNum} 页：开始" + "==" * 10)
-        parsed_html = etree.HTML(result)
-        # 判断是否是最后一页
-        is_final_page = parsed_html.xpath(
-            '//table[@class="tb_01"]/tr')
-        if len(is_final_page) <= 3:
-            print(f"第 {pageNum} 页无内容：{URL}")
-            if pageNum == 1:
-                print(result)
-            return False
+        if pageNum == 1:
+            # 对于第一页，需要反复爬取，直到内容正确返回。
+            retried_time = 1
+            while True:
+                print("==" * 10 +
+                      f"{self.reportDate} 日第 {pageNum} 页：开始" + "==" * 10)
+                parsed_html = scrape_page(URL, HEADERS)
+                tr_length = len(parsed_html.xpath(
+                    '//table[@class="tb_01"]/tr'))
+                if tr_length >= 3:
+                    break
+                elif retried_time >= 5:
+                    # 反复10次还是爬不到，就记下来
+                    print(f"第 1 页爬取错误：{tr_length}, {URL}")
+                    with open(self.records_txt, 'a', encoding='utf-8', errors='ignore') as f:
+                        f.write(f'{URL},{self.reportDate}\n')
+                    break
+                else:
+                    print(f"第 1 页无内容：{tr_length}, {URL}，继续（{retried_time}/5）")
+                    retried_time += 1
+                    time.sleep(random.uniform(5, 15))
+                    continue
+        if pageNum != 1:
+            # 对于其他页，直接爬取，不需要反复爬取。
+            parsed_html = scrape_page(URL, HEADERS)
+            is_final_page = parsed_html.xpath(
+                '//table[@class="tb_01"]/tr')
+            if len(is_final_page) <= 3:
+                print(f"第 {pageNum} 页无内容：{len(is_final_page)}, {URL}")
+                # 无内容也有可能是网页错误，所以也记下来
+                with open(self.records_txt, 'a', encoding='utf-8', errors='ignore') as f:
+                    f.write(f'{URL},{self.reportDate}\n')
+                return False
         print(f"第 {pageNum} 页开始：{URL}")
-        # 处理超链接
-        file_url = parsed_html.xpath('//td[@class="tal f14"]/a/@href')
-        file_url = [f"https:{url}" for url in file_url]
-        # 处理标题
-        file_title = parsed_html.xpath('//td[@class="tal f14"]/a/@title')
-        # 报告类型，债券/行业/宏观/公司等等
-        file_type = parsed_html.xpath(
-            '//div[@class="main"]/table/tr/td[3]/text()')
-        # 处理机构
-        file_broker = parsed_html.xpath(
-            '//div[@class="main"]/table/tr/td[5]/a/div/span/text()')
-        # 处理研究员
-        file_researcher = parsed_html.xpath(
-            '//div[@class="main"]/table/tr/td[6]/div/span/text()')
-        file_info = [file_url, file_title, file_type,
-                     file_broker, file_researcher]
-        file_info = list(zip(*file_info))
+        file_info = unpack_and_standarise_response(parsed_html)
         for files in file_info:
             self.download_file(files)
         print("==" * 10 + f"{self.reportDate} 日第 {pageNum} 页：已完成" + "==" * 10)
@@ -163,13 +228,21 @@ def create_date_intervals(start_date="2000-01-01", end_date=None) -> list:
     return date_intervals
 
 
-SAVING_PATH = rf"E:\[待整理]Source_for_sale\券商研报"
+# ######################################################
+# """此处为需要修改的代码"""
+# start_date = "2000-01-01"
+# end_date = "2023-11-11"  # None # "2023-09-09"
+# records_txt = r"E:\[待整理]Source_for_sale\券商研报\已下载记录.txt"
+# get_url_from_file = 0
+
+# ######################################################
 # if __name__ == "__main__":
-#     start_date = "2000-12-31"
-#     end_date = None
-#     for Times in create_date_intervals(start_date, end_date)[::-1]:
-#         page = 1
-#         while True:
-#             if DateProcesser(Times).process_page_for_downloads(page) == False:
-#                 break
-#             page += 1
+#     if get_url_from_file == 1:
+#         DateProcesser("", records_txt).process_url_from_files()
+#     else:
+#         for Times in create_date_intervals(start_date, end_date)[::-1]:
+#             page = 1
+#             while True:
+#                 if DateProcesser(Times, records_txt).process_page_for_downloads(page) == False:
+#                     break
+#                 page += 1
