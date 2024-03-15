@@ -2,6 +2,7 @@
 import requests
 import time
 import os
+import re
 import pandas as pd
 from lxml import etree
 import random
@@ -26,17 +27,15 @@ class DateProcesser:
         time.sleep(random.uniform(5, 15))
         print("==" * 10 + f"{self.reportDate} 日第 {pageNum} 页：开始" + "==" * 10)
         parsed_html = etree.HTML(result)
-        # 判断是否已经结束
+        # 判断是否是最后一页
         is_final_page = parsed_html.xpath(
             '//table[@class="tb_01"]/tr')
-        if len(is_final_page) <= 3 and pageNum == 1:
-            parsed_html = etree.HTML(
-                result=requests.get(URL, headers=HEADERS).text)
-            is_final_page = parsed_html.xpath(
-                '//table[@class="tb_01"]/tr')
         if len(is_final_page) <= 3:
             print(f"第 {pageNum} 页无内容：{URL}")
+            if pageNum == 1:
+                print(result)
             return False
+        print(f"第 {pageNum} 页开始：{URL}")
         # 处理超链接
         file_url = parsed_html.xpath('//td[@class="tal f14"]/a/@href')
         file_url = [f"https:{url}" for url in file_url]
@@ -68,7 +67,9 @@ class DateProcesser:
         # 从标题中获取代码、简称和文章题目
         shortName, ids, headline = get_id_and_name(title)
         # 有些证券公司总喜欢搞些奇怪的格式
-        shortName = shortName.replace("深度*公司*", "")
+        if shortName is None:
+            print(f"\t标题格式不正确：{type}\t{title}")
+            return
         # 组成文件的简称
         file_short_name = f"{ids}_{broker}_{shortName}_{self.reportDate}"
         # 组成文件在表中的列表
