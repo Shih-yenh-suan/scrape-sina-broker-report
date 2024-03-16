@@ -12,14 +12,14 @@ HEADERS = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0',
 }
-SAVING_PATH = rf"E:\[待整理]Source_for_sale\券商研报"
+SAVING_PATH = r"E:\[待整理]Source_for_sale\券商研报\新浪研报"
 
 
 def scrape_page(URL, HEADERS):
     """爬取代码封装"""
     result = retry_on_failure(
         lambda: requests.get(URL, headers=HEADERS).text)
-    time.sleep(random.uniform(1, 5))
+    # time.sleep(random.uniform(1, 5))
     parsed_html = etree.HTML(result)
     return parsed_html
 
@@ -67,13 +67,31 @@ class DateProcesser:
                 break
             record = records[0]
             url = record.split(',')[0]
-            reportDate = record.split(',')[1]
+            reportDate = record.split(',')[1].rstrip()
             self.reportDate = reportDate
-            print(f"开始：{url}")
-            parsed_html = scrape_page(url, HEADERS)
-            file_info = unpack_and_standarise_response(parsed_html)
-            for files in file_info:
-                self.download_file(files)
+            # 修改 url，从 url提供的数字开始，向上 +1，循环爬取
+            match = re.search(r"&p=(\d+)&", url)
+            pageNum = int(match.group(1))
+            while True:
+                new_url = re.sub(r'(&p=)\d+', r'\g<1>' + str(pageNum), url)
+                print(f"开始：{new_url}")
+                parsed_html = scrape_page(new_url, HEADERS)
+                is_final_page = parsed_html.xpath(
+                    '//table[@class="tb_01"]/tr')
+                if len(is_final_page) == 3:
+                    print(f"第 {pageNum} 页无内容：{len(is_final_page)}, {new_url}")
+                    break
+                elif len(is_final_page) == 0:
+                    # 为0说明爬取错误了，直接退出，同时更新链接
+                    with open(self.records_txt, 'w', encoding='utf-8', errors='ignore') as file:
+                        file.writelines(f"{new_url},{reportDate}\n")
+                        file.writelines(records[1:])
+                    print(f"第 {pageNum} 页错误：{len(is_final_page)}, {new_url}")
+                    return
+                file_info = unpack_and_standarise_response(parsed_html)
+                for files in file_info:
+                    self.download_file(files)
+                pageNum += 1
             # 处理完成后，从记录中移除当前URL，也就是不将当前URL加回去
             with open(self.records_txt, 'w', encoding='utf-8', errors='ignore') as file:
                 file.writelines(records[1:])
@@ -82,40 +100,24 @@ class DateProcesser:
     def process_page_for_downloads(self, pageNum: int):
         """处理指定页码的公告信息并下载相关文件"""
         URL = f'https://stock.finance.sina.com.cn/stock/go.php/vReport_List/kind/search/index.phtml?t1=6&symbol=&p={pageNum}&pubdate={self.reportDate}'
-        # 向网站获取内容和总页数，必须分开获取，否则容易报错
-        if pageNum == 1:
-            # 对于第一页，需要反复爬取，直到内容正确返回。
-            retried_time = 1
-            while True:
-                print("==" * 10 +
-                      f"{self.reportDate} 日第 {pageNum} 页：开始" + "==" * 10)
-                parsed_html = scrape_page(URL, HEADERS)
-                tr_length = len(parsed_html.xpath(
-                    '//table[@class="tb_01"]/tr'))
-                if tr_length >= 3:
-                    break
-                elif retried_time >= 5:
-                    # 反复10次还是爬不到，就记下来
-                    print(f"第 1 页爬取错误：{tr_length}, {URL}")
-                    with open(self.records_txt, 'a', encoding='utf-8', errors='ignore') as f:
-                        f.write(f'{URL},{self.reportDate}\n')
-                    break
-                else:
-                    print(f"第 1 页无内容：{tr_length}, {URL}，继续（{retried_time}/5）")
-                    retried_time += 1
-                    time.sleep(random.uniform(5, 15))
-                    continue
-        if pageNum != 1:
-            # 对于其他页，直接爬取，不需要反复爬取。
-            parsed_html = scrape_page(URL, HEADERS)
-            is_final_page = parsed_html.xpath(
-                '//table[@class="tb_01"]/tr')
-            if len(is_final_page) <= 3:
-                print(f"第 {pageNum} 页无内容：{len(is_final_page)}, {URL}")
-                # 无内容也有可能是网页错误，所以也记下来
-                with open(self.records_txt, 'a', encoding='utf-8', errors='ignore') as f:
-                    f.write(f'{URL},{self.reportDate}\n')
-                return False
+        parsed_html = scrape_page(URL, HEADERS)
+        is_final_page = parsed_html.xpath(
+            '//table[@class="tb_01"]/tr')
+        if len(is_final_page) == 3:
+            # 刚好为3的时候，是无内容的
+            print(f"第 {pageNum} 页开始，可能是最后一页：{URL}")
+            file_info = unpack_and_standarise_response(parsed_html)
+            for files in file_info:
+                self.download_file(files)
+            print("==" * 10 +
+                  f"{self.reportDate} 日第 {pageNum} 页：已完成" + "==" * 10)
+            return False
+        elif len(is_final_page) == 0:
+            # 为0说明爬取错误了，记下来。
+            print(f"第 {pageNum} 页错误：{len(is_final_page)}, {URL}")
+            with open(self.records_txt, 'a', encoding='utf-8', errors='ignore') as f:
+                f.write(f'{URL},{self.reportDate}\n')
+            return False
         print(f"第 {pageNum} 页开始：{URL}")
         file_info = unpack_and_standarise_response(parsed_html)
         for files in file_info:
