@@ -14,15 +14,46 @@ https://stock.finance.sina.com.cn/stock/go.php/vReport_List/kind/search/index.ph
 ## 使用方式
 
 1. 将 SAVING_PATH 修改为文件的保存路径
-2. 取消最后几行的注释
-3. 修改 get_url_from_file 参数，选择是从文件中获取 url 还是根据日期和页码获取。
-4. *可选：*
 
-   - start_date：定义爬取的开始日期（含）
+```
+SAVING_PATH = r""
+```
 
-   - end_date：定义爬取的结束日期（含）
+2. 运行代码
 
-   默认开始日期为2000年1月1日，结束日期为当前日期
+```
+DateProcesser(Times, records_txt).process_page_for_downloads(page)
+```
+
+其中：
+Times 为指定的日期，形如“YYYY-MM-DD”
+records_txt 为下载异常的网址名单存放路径
+page 为指定的下载页。
+
+如需要循环爬取，请使用如下代码：
+
+```
+for Times in create_date_intervals(start_date, end_date):
+   page = 1
+   while True:
+         if DateProcesser(Times, records_txt).process_page_for_downloads(page) == False:
+            break
+         page += 1
+```
+其中：
+start_date：定义爬取的开始日期（含）
+end_date：定义爬取的结束日期（含）
+默认开始日期为2000年1月1日，结束日期为当前日期
+
+
+3. 对爬取失败的网址进行重新爬取：
+
+```
+DateProcesser("", records_txt).process_url_from_files()
+```
+
+其中：
+records_txt 为下载异常的网址名单存放路径
 
 
 ## 问题和Todo
@@ -32,4 +63,4 @@ https://stock.finance.sina.com.cn/stock/go.php/vReport_List/kind/search/index.ph
    1. 可能遗漏其他个股研报，但目前没发现
    2. 完全可以实现对其他类型的爬取，但目前无需求，且未想到好的保存方法
 3. 有时候会抽风，明明页面还有内容，就显示没有了，会造成遗漏
-   1. 已解决：见思路2
+   1. 已解决：见上面的3
