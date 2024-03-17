@@ -205,7 +205,7 @@ def get_id_and_name(title: str) -> tuple:
             code = title[left_parenthesis_index + 1:right_parenthesis_index]
             code = str(code)
             # 提取括号右边的部分作为标题
-            title = title[right_parenthesis_index + 2:]
+            title = title[right_parenthesis_index + 1:]
             title = title.title().replace(":", "", 1)
         else:
             code = None
