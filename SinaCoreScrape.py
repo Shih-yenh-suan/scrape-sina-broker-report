@@ -86,8 +86,12 @@ class DateProcesser:
                 is_final_page = parsed_html.xpath(
                     '//table[@class="tb_01"]/tr')
                 if len(is_final_page) == 3:
-                    print(f"第 {pageNum} 页无内容：{len(is_final_page)}, {new_url}")
-                    break
+                    tr_length = len(parsed_html.xpath(
+                        '//table[@class="tb_01"]/tr[3]/td'))
+                    if tr_length == 1:
+                        print(
+                            f"第 {pageNum} 页无内容：{len(is_final_page)}, {new_url}")
+                        break
                 elif len(is_final_page) == 0:
                     # 为0说明爬取错误了，直接退出，同时更新链接
                     with open(self.records_txt, 'w', encoding='utf-8', errors='ignore') as file:
@@ -121,14 +125,17 @@ class DateProcesser:
         is_final_page = parsed_html.xpath(
             '//table[@class="tb_01"]/tr')
         if len(is_final_page) == 3:
-            # 刚好为3的时候，是无内容的
-            print(f"第 {pageNum} 页开始，可能是最后一页：{URL}")
-            file_info = unpack_and_standarise_response(parsed_html)
-            for files in file_info:
-                self.download_file(files, urls)
-            print("==" * 10 +
-                  f"{self.reportDate} 日第 {pageNum} 页：已完成" + "==" * 10)
-            return False
+            tr_length = len(parsed_html.xpath(
+                '//table[@class="tb_01"]/tr[3]/td'))
+            if tr_length == 1:
+                # 刚好为3行，且只有一列的时候，是无内容的
+                print(f"第 {pageNum} 页开始，可能是最后一页：{URL}")
+                file_info = unpack_and_standarise_response(parsed_html)
+                for files in file_info:
+                    self.download_file(files, urls)
+                print("==" * 10 +
+                      f"{self.reportDate} 日第 {pageNum} 页：已完成" + "==" * 10)
+                return False
         elif len(is_final_page) == 0:
             # 为0说明爬取错误了，记下来。
             print(f"第 {pageNum} 页错误：{len(is_final_page)}, {URL}")
