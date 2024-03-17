@@ -211,6 +211,11 @@ def get_id_and_name(title: str) -> tuple:
         if right_parenthesis_index != -1:
             # 提取括号内的内容作为代码
             code = title[left_parenthesis_index + 1:right_parenthesis_index]
+            if re.match(r'^\d{6}$', code):
+                # 如果是六个数字，则保留 code，否则设为 None
+                pass
+            else:
+                code = None
             code = str(code)
             # 提取括号右边的部分作为标题
             title = title[right_parenthesis_index + 1:]
