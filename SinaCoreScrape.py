@@ -194,6 +194,7 @@ def retry_on_failure(func):
 def get_id_and_name(title: str) -> tuple:
     """从研报标题中提取代码、简称和文章题目"""
     left_parenthesis_index = title.find('(')
+    left_parenthesis_index_2 = title.find('-')
     if left_parenthesis_index != -1:
         # 提取左括号左边的内容作为简称
         short_name = title[:left_parenthesis_index]
@@ -210,6 +211,10 @@ def get_id_and_name(title: str) -> tuple:
         else:
             code = None
             title = None
+    elif left_parenthesis_index_2 != -1:
+        short_name = title[:left_parenthesis_index_2]
+        title = title[left_parenthesis_index_2 + 1:]
+        code = None
     else:
         short_name = None
         code = None
