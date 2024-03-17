@@ -50,6 +50,9 @@ class DateProcesser:
     def __init__(self, reportDate, records_txt):
         self.reportDate = reportDate
         self.records_txt = records_txt
+        self.csv_index = ["股票代码", "券商简称", "发布日期",
+                          "企业简称", "研报标题", "报告链接", "研报摘要"]
+        self.saving_file = f"{SAVING_PATH}\{self.reportDate[:7]}.csv"
 
     def process_url_from_files(self):
         """从文件中获取URL，重新执行爬取"""
@@ -99,6 +102,15 @@ class DateProcesser:
 
     def process_page_for_downloads(self, pageNum: int):
         """处理指定页码的公告信息并下载相关文件"""
+        # 持久化存储
+        if not os.path.exists(self.saving_file):
+            df = pd.DataFrame(columns=self.csv_index)
+            df.to_csv(self.saving_file, index=False)
+        # 以文件链接作为主键，防止重复下载
+        df = pd.read_csv(self.saving_file, encoding='utf-8-sig',
+                         encoding_errors="ignore", dtype=str)
+        urls = [str(row["报告链接"])
+                for index, row in df.iterrows()]
         URL = f'https://stock.finance.sina.com.cn/stock/go.php/vReport_List/kind/search/index.phtml?t1=6&symbol=&p={pageNum}&pubdate={self.reportDate}'
         parsed_html = scrape_page(URL, HEADERS)
         is_final_page = parsed_html.xpath(
@@ -108,7 +120,7 @@ class DateProcesser:
             print(f"第 {pageNum} 页开始，可能是最后一页：{URL}")
             file_info = unpack_and_standarise_response(parsed_html)
             for files in file_info:
-                self.download_file(files)
+                self.download_file(files, urls)
             print("==" * 10 +
                   f"{self.reportDate} 日第 {pageNum} 页：已完成" + "==" * 10)
             return False
@@ -121,10 +133,10 @@ class DateProcesser:
         print(f"第 {pageNum} 页开始：{URL}")
         file_info = unpack_and_standarise_response(parsed_html)
         for files in file_info:
-            self.download_file(files)
+            self.download_file(files, urls)
         print("==" * 10 + f"{self.reportDate} 日第 {pageNum} 页：已完成" + "==" * 10)
 
-    def download_file(self, files):
+    def download_file(self, files, urls):
         """分块下载文件"""
         (url, title, type, broker, researcher) = files
         # 跳过不是个股研究的报告
@@ -142,17 +154,6 @@ class DateProcesser:
         # 组成文件在表中的列表
         csv_info_list = [ids, broker, self.reportDate,
                          shortName, headline, url, []]
-        csv_index = ["股票代码", "券商简称", "发布日期", "企业简称", "研报标题", "报告链接", "研报摘要"]
-        # 持久化存储
-        saving_file = f"{SAVING_PATH}\{self.reportDate[:7]}.csv"
-        if not os.path.exists(saving_file):
-            df = pd.DataFrame(columns=csv_index)
-            df.to_csv(saving_file, index=False)
-        # 以文件链接作为主键，防止重复下载
-        df = pd.read_csv(saving_file, encoding='utf-8-sig',
-                         encoding_errors="ignore", dtype=str)
-        urls = [str(row["报告链接"])
-                for index, row in df.iterrows()]
         # 如果主键已经存在在文件中，则跳过
         if url in urls:
             print(f"{file_short_name}：已存在，跳过")
@@ -167,8 +168,8 @@ class DateProcesser:
         file_content = "\n".join(file_content)
         csv_info_list[6] = file_content
         # 追加文件
-        df = pd.DataFrame([csv_info_list], columns=csv_index)
-        df.to_csv(saving_file, mode='a', header=False, index=False)
+        df = pd.DataFrame([csv_info_list], columns=self.csv_index)
+        df.to_csv(self.saving_file, mode='a', header=False, index=False)
         print(f"{file_short_name}：已保存")
 
 
