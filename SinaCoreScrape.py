@@ -19,7 +19,7 @@ def scrape_page(URL, HEADERS):
     """爬取代码封装"""
     result = retry_on_failure(
         lambda: requests.get(URL, headers=HEADERS).text)
-    # time.sleep(random.uniform(1, 5))
+    time.sleep(random.uniform(0.5, 1.5))
     parsed_html = etree.HTML(result)
     return parsed_html
 
@@ -52,7 +52,6 @@ class DateProcesser:
         self.records_txt = records_txt
         self.csv_index = ["股票代码", "券商简称", "发布日期",
                           "企业简称", "研报标题", "报告链接", "研报摘要"]
-        self.saving_file = f"{SAVING_PATH}\{self.reportDate[:7]}.csv"
 
     def process_url_from_files(self):
         """从文件中获取URL，重新执行爬取"""
@@ -72,6 +71,11 @@ class DateProcesser:
             url = record.split(',')[0]
             reportDate = record.split(',')[1].rstrip()
             self.reportDate = reportDate
+            saving_file = f"{SAVING_PATH}\{self.reportDate[:7]}.csv"
+            df = pd.read_csv(saving_file, encoding='utf-8-sig',
+                             encoding_errors="ignore", dtype=str)
+            urls = [str(row["报告链接"])
+                    for index, row in df.iterrows()]
             # 修改 url，从 url提供的数字开始，向上 +1，循环爬取
             match = re.search(r"&p=(\d+)&", url)
             pageNum = int(match.group(1))
@@ -93,7 +97,7 @@ class DateProcesser:
                     return
                 file_info = unpack_and_standarise_response(parsed_html)
                 for files in file_info:
-                    self.download_file(files)
+                    self.download_file(files, urls)
                 pageNum += 1
             # 处理完成后，从记录中移除当前URL，也就是不将当前URL加回去
             with open(self.records_txt, 'w', encoding='utf-8', errors='ignore') as file:
@@ -103,11 +107,12 @@ class DateProcesser:
     def process_page_for_downloads(self, pageNum: int):
         """处理指定页码的公告信息并下载相关文件"""
         # 持久化存储
-        if not os.path.exists(self.saving_file):
+        saving_file = f"{SAVING_PATH}\{self.reportDate[:7]}.csv"
+        if not os.path.exists(saving_file):
             df = pd.DataFrame(columns=self.csv_index)
-            df.to_csv(self.saving_file, index=False)
+            df.to_csv(saving_file, index=False)
         # 以文件链接作为主键，防止重复下载
-        df = pd.read_csv(self.saving_file, encoding='utf-8-sig',
+        df = pd.read_csv(saving_file, encoding='utf-8-sig',
                          encoding_errors="ignore", dtype=str)
         urls = [str(row["报告链接"])
                 for index, row in df.iterrows()]
@@ -168,8 +173,9 @@ class DateProcesser:
         file_content = "\n".join(file_content)
         csv_info_list[6] = file_content
         # 追加文件
+        saving_file = f"{SAVING_PATH}\{self.reportDate[:7]}.csv"
         df = pd.DataFrame([csv_info_list], columns=self.csv_index)
-        df.to_csv(self.saving_file, mode='a', header=False, index=False)
+        df.to_csv(saving_file, mode='a', header=False, index=False)
         print(f"{file_short_name}：已保存")
 
 
