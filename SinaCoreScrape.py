@@ -232,7 +232,7 @@ def get_id_and_name(title: str) -> tuple:
         code = None
         title = None
 
-    return short_name, code, title
+    return short_name, str(code), title
 
 
 def create_date_intervals(start_date="2000-01-01", end_date=None) -> list:
