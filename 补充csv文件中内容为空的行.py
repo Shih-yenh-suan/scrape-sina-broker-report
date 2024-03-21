@@ -49,6 +49,7 @@ def get_file_content(url):
         '//div[@class="blk_container"]/p/text()')
     file_content = [f.strip() for f in file_content]
     file_content = "\n".join(file_content)
+    print(file_content)
     return file_content
 
 
