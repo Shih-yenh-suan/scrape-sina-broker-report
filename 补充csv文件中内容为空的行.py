@@ -34,7 +34,7 @@ def process_csv(file_path):
         # 对于每一行，获取文件内容并添加到“研报摘要”列
         for i, (index, row) in enumerate(rows_to_process.iterrows()):
             print(
-                f"{row['股票代码']}_{row['发布日期']}：正在处理{i+1}/{len(rows_to_process)}")
+                f"{time.strftime('%H:%M:%S', time.localtime())}: {row['股票代码']}_{row['发布日期']}：正在处理{i+1}/{len(rows_to_process)}")
             report_link = row['报告链接']
             # 使用你已经实现的 get_file_content 函数
             file_content = get_file_content(report_link)
@@ -54,9 +54,9 @@ def get_file_content(url):
 
 # 输入文件夹路径
 folder_path = r"E:\[待整理]Source_for_sale\券商研报\已整理"
-file_path = r"E:\[待整理]Source_for_sale\券商研报\新浪研报\2021-06.csv"
+file_path = r"E:\[待整理]Source_for_sale\券商研报\新浪研报\2021-04.csv"
 
 # 处理csv文件夹
-# process_csv_files(folder_path)
+process_csv_files(folder_path)
 # 处理csv文件
-process_csv(file_path)
+# process_csv(file_path)
