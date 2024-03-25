@@ -17,7 +17,7 @@ def process_csv_files(folder_path):
         folder_path) if file.endswith('.csv')]
 
     # 遍历每个csv文件
-    for file in csv_files:
+    for file in csv_files[::-1]:
         file = os.path.join(folder_path, file)
         process_csv(file)
 
@@ -43,13 +43,22 @@ def process_csv(file_path):
 
 
 def get_file_content(url):
-    file_content = retry_on_failure(lambda:
-                                    requests.get(url, headers=HEADERS).text)
-    time.sleep(random.uniform(0.5, 1.5))
-    file_content = etree.HTML(file_content).xpath(
-        '//div[@class="blk_container"]/p/text()')
-    file_content = [f.strip() for f in file_content]
-    file_content = "\n".join(file_content)
+    repeat_times = 1
+    while True:
+        file_content = retry_on_failure(lambda:
+                                        requests.get(url, headers=HEADERS).text)
+        time.sleep(random.uniform(0.5, 1.5))
+        file_content = etree.HTML(file_content).xpath(
+            '//div[@class="blk_container"]/p/text()')
+        file_content = [f.strip() for f in file_content]
+        file_content = "\n".join(file_content)
+        if file_content:
+            break
+        else:
+            t = random.uniform(1, 3) * repeat_times
+            print(f"{url} 为空，暂停 {t} 秒")
+            time.sleep(t)
+            repeat_times += 1
     print(f"{file_content[:100]}…………")
     return file_content
 
