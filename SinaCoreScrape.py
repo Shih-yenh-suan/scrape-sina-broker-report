@@ -192,8 +192,8 @@ def retry_on_failure(func):
     try:
         result = func()
         return result
-    except requests.exceptions.ProxyError as e:
-        print(f'Error: {e}, 暂停 {pause_time} 秒')
+    except:
+        print(f'Error, 暂停 {pause_time} 秒')
         time.sleep(pause_time)
         return retry_on_failure(func)
 

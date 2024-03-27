@@ -64,7 +64,7 @@ def get_file_content(url):
 
 
 # 输入文件夹路径
-folder_path = r"E:\[待整理]Source_for_sale\券商研报\已整理"
+folder_path = r"E:\[待整理]Source_for_sale\券商研报\未整理"
 file_path = r"E:\[待整理]Source_for_sale\券商研报\新浪研报\2021-04.csv"
 
 # 处理csv文件夹
