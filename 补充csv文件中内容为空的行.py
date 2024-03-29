@@ -52,7 +52,7 @@ def get_file_content(url):
             '//div[@class="blk_container"]/p/text()')
         file_content = [f.strip() for f in file_content]
         file_content = "\n".join(file_content)
-        if file_content or repeat_times >= 10:
+        if file_content or repeat_times > 10:
             break
         else:
             t = random.uniform(1, 3) * repeat_times
