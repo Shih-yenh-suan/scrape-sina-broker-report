@@ -55,7 +55,7 @@ def get_file_content(url):
         if file_content or repeat_times > 10:
             break
         else:
-            t = random.uniform(1, 3) * repeat_times
+            t = random.uniform(2, 5) * repeat_times
             print(f"{url} 为空，暂停 {t} 秒")
             time.sleep(t)
             repeat_times += 1
