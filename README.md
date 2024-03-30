@@ -22,7 +22,7 @@ SAVING_PATH = r""
 2. 运行代码
 
 ```
-DateProcesser(Times, records_txt).process_page_for_downloads(page)
+DateProcesser(Times, records_txt, SAVING_PATH).process_page_for_downloads(page)
 ```
 
 其中：
@@ -36,7 +36,7 @@ page 为指定的下载页。
 for Times in create_date_intervals(start_date, end_date):
    page = 1
    while True:
-         if DateProcesser(Times, records_txt).process_page_for_downloads(page) == False:
+         if DateProcesser(Times, records_txt, SAVING_PATH).process_page_for_downloads(page) == False:
             break
          page += 1
 ```
@@ -49,7 +49,7 @@ end_date：定义爬取的结束日期（含）
 3. 对爬取失败的网址进行重新爬取：
 
 ```
-DateProcesser("", records_txt).process_url_from_files()
+DateProcesser("", records_txt, SAVING_PATH).process_url_from_files()
 ```
 
 其中：
@@ -63,3 +63,4 @@ records_txt 为下载异常的网址名单存放路径
    2. 完全可以实现对其他类型的爬取，但目前无需求，且未想到好的保存方法
 3. 有时候会抽风，明明页面还有内容，就显示没有了，会造成遗漏
    1. 已解决：见上面的 3
+   2. 使用 补充文件中内容为空的行.py 文件，对已保存的 csv 中，内容缺失的文件重新爬取

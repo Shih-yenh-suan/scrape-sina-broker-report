@@ -12,7 +12,6 @@ HEADERS = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0',
 }
-SAVING_PATH = r"E:\[待整理]Source_for_sale\券商研报\新浪研报"
 
 
 def scrape_page(URL, HEADERS):
@@ -47,11 +46,12 @@ def unpack_and_standarise_response(parsed_html):
 
 
 class DateProcesser:
-    def __init__(self, reportDate, records_txt):
+    def __init__(self, reportDate, records_txt, saving_path):
         self.reportDate = reportDate
         self.records_txt = records_txt
         self.csv_index = ["股票代码", "券商简称", "发布日期",
                           "企业简称", "研报标题", "报告链接", "研报摘要"]
+        self.saving_path = saving_path
 
     def process_url_from_files(self):
         """从文件中获取URL，重新执行爬取"""
@@ -71,7 +71,7 @@ class DateProcesser:
             url = record.split(',')[0]
             reportDate = record.split(',')[1].rstrip()
             self.reportDate = reportDate
-            saving_file = f"{SAVING_PATH}\{self.reportDate[:7]}.csv"
+            saving_file = f"{self.saving_path}\{self.reportDate[:7]}.csv"
             df = pd.read_csv(saving_file, encoding='utf-8-sig',
                              encoding_errors="ignore", dtype=str)
             urls = [str(row["报告链接"])
@@ -111,7 +111,7 @@ class DateProcesser:
     def process_page_for_downloads(self, pageNum: int):
         """处理指定页码的公告信息并下载相关文件"""
         # 持久化存储
-        saving_file = f"{SAVING_PATH}\{self.reportDate[:7]}.csv"
+        saving_file = f"{self.saving_path}\{self.reportDate[:7]}.csv"
         if not os.path.exists(saving_file):
             df = pd.DataFrame(columns=self.csv_index)
             df.to_csv(saving_file, index=False)
@@ -180,7 +180,7 @@ class DateProcesser:
         file_content = "\n".join(file_content)
         csv_info_list[6] = file_content
         # 追加文件
-        saving_file = f"{SAVING_PATH}\{self.reportDate[:7]}.csv"
+        saving_file = f"{self.saving_path}\{self.reportDate[:7]}.csv"
         df = pd.DataFrame([csv_info_list], columns=self.csv_index)
         df.to_csv(saving_file, mode='a', header=False, index=False)
         print(f"{file_short_name}：已保存")
@@ -260,15 +260,17 @@ def create_date_intervals(start_date="2000-01-01", end_date=None) -> list:
 # end_date = "2023-11-11"  # None # "2023-09-09"
 # records_txt = r"E:\[待整理]Source_for_sale\券商研报\已下载记录.txt"
 # get_url_from_file = 0
+# saving_path = r"E:\[待整理]Source_for_sale\券商研报\新浪研报"
 
 # ######################################################
 # if __name__ == "__main__":
 #     if get_url_from_file == 1:
-#         DateProcesser("", records_txt).process_url_from_files()
+#         DateProcesser("2000-01-01", records_txt,
+#                       saving_path).process_url_from_files()
 #     else:
-#         for Times in create_date_intervals(start_date, end_date)[::-1]:
+#         for Times in create_date_intervals(start_date, end_date):
 #             page = 1
 #             while True:
-#                 if DateProcesser(Times, records_txt).process_page_for_downloads(page) == False:
+#                 if DateProcesser(Times, records_txt, saving_path).process_page_for_downloads(page) == False:
 #                     break
 #                 page += 1
