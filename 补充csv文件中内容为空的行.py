@@ -59,7 +59,7 @@ def get_file_content(url):
             print(f"{url} 为空，暂停 {t} 秒")
             time.sleep(t)
             repeat_times += 1
-    print(f"{file_content[:100]}…………")
+    print(f"{file_content[:50]}…………")
     return file_content
 
 
