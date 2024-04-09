@@ -1,4 +1,4 @@
+.gitignore
 __pycache__/
 Config.py
-慧博.py
 record.py
