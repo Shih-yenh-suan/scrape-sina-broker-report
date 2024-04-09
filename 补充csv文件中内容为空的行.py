@@ -4,7 +4,7 @@ import requests
 import time
 import random
 from lxml import etree
-from SinaCoreScrape import retry_on_failure
+from SinaCoreScrape import retry_on_failure, get_file_content
 HEADERS = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0',
@@ -40,27 +40,6 @@ def process_csv(file_path):
             file_content = get_file_content(report_link)
             df.at[index, '研报摘要'] = file_content
             df.to_csv(file_path, encoding='utf-8-sig', index=False)
-
-
-def get_file_content(url):
-    repeat_times = 1
-    while True:
-        file_content = retry_on_failure(lambda:
-                                        requests.get(url, headers=HEADERS).text)
-        time.sleep(random.uniform(0.5, 1.5))
-        file_content = etree.HTML(file_content).xpath(
-            '//div[@class="blk_container"]/p/text()')
-        file_content = [f.strip() for f in file_content]
-        file_content = "\n".join(file_content)
-        if file_content or repeat_times > 10:
-            break
-        else:
-            t = random.uniform(2, 5) * repeat_times
-            print(f"{url} 为空，暂停 {t} 秒")
-            time.sleep(t)
-            repeat_times += 1
-    print(f"{file_content[:50]}…………")
-    return file_content
 
 
 # 输入文件夹路径

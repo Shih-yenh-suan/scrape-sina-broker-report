@@ -171,14 +171,7 @@ class DateProcesser:
             print(f"{file_short_name}：已存在，跳过")
             return
         # 获取文件内容
-        file_content = retry_on_failure(lambda:
-                                        requests.get(url, headers=HEADERS).text)
-        time.sleep(random.uniform(0.5, 1.5))
-        file_content = etree.HTML(file_content).xpath(
-            '//div[@class="blk_container"]/p/text()')
-        file_content = [f.strip() for f in file_content]
-        file_content = "\n".join(file_content)
-        csv_info_list[6] = file_content
+        csv_info_list[6] = get_file_content(url)
         # 追加文件
         saving_file = f"{self.saving_path}\{self.reportDate[:7]}.csv"
         df = pd.DataFrame([csv_info_list], columns=self.csv_index)
@@ -252,6 +245,27 @@ def create_date_intervals(start_date="2000-01-01", end_date=None) -> list:
         current_date += datetime.timedelta(days=1)
 
     return date_intervals
+
+
+def get_file_content(url):
+    repeat_times = 1
+    while True:
+        file_content = retry_on_failure(lambda:
+                                        requests.get(url, headers=HEADERS).text)
+        time.sleep(random.uniform(0.5, 1.5))
+        file_content = etree.HTML(file_content).xpath(
+            '//div[@class="blk_container"]/p/text()')
+        file_content = [f.strip() for f in file_content]
+        file_content = "\n".join(file_content)
+        if file_content or repeat_times > 10:
+            break
+        else:
+            t = random.uniform(2, 5) * repeat_times
+            print(f"{url} 为空，暂停 {t} 秒")
+            time.sleep(t)
+            repeat_times += 1
+    print(f"{file_content[:50]}…………")
+    return file_content
 
 
 # ######################################################
