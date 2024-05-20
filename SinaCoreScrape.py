@@ -211,14 +211,11 @@ def get_id_and_name(title: str) -> tuple:
                 code = None
             code = str(code)
             # 提取括号右边的部分作为标题
-            title = title[right_parenthesis_index + 1:]
-            title = title.title().replace(":", "", 1)
         else:
             code = None
             title = None
     elif left_parenthesis_index_2 != -1:
         short_name = title[:left_parenthesis_index_2]
-        title = title[left_parenthesis_index_2 + 1:]
         code = None
     else:
         short_name = None
