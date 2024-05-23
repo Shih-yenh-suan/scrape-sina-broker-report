@@ -14,10 +14,10 @@ HEADERS = {
 }
 
 
-def scrape_page(URL, HEADERS):
+def scrape_page(URL, HEADERS, proxies):
     """爬取代码封装"""
     result = retry_on_failure(
-        lambda: requests.get(URL, headers=HEADERS).text)
+        lambda: requests.get(URL, headers=HEADERS, proxies=proxies).text)
     time.sleep(random.uniform(0.5, 1.5))
     parsed_html = etree.HTML(result)
     return parsed_html
@@ -45,13 +45,39 @@ def unpack_and_standarise_response(parsed_html):
     return file_info
 
 
+df = pd.read_excel(r"basicInfo.xlsx", header=None, names=[
+    "stock_code", "company_name"])
+name_to_code = df.set_index('company_name')['stock_code'].to_dict()
+
+
+def find_stock_code(input_string):
+    # 读取Excel文件
+    # 查找股票代码模式
+    stock_code_pattern = re.compile(r'\d{6}')
+    stock_code_match = stock_code_pattern.search(input_string)
+    if stock_code_match:
+        matched_code = stock_code_match.group()
+        if matched_code in df['stock_code'].values:
+            return matched_code
+
+        return stock_code_match.group()
+
+    # 如果没有找到股票代码，则查找企业简称
+    for company_name in name_to_code:
+        if company_name in input_string:
+            return name_to_code[company_name]
+
+    # 如果没有找到匹配的股票代码或企业简称，返回None
+    return None
+
+
 class DateProcesser:
-    def __init__(self, reportDate, records_txt, saving_path):
+    def __init__(self, reportDate, records_txt, saving_path, proxies={}):
         self.reportDate = reportDate
         self.records_txt = records_txt
-        self.csv_index = ["股票代码", "券商简称", "发布日期",
-                          "企业简称", "研报标题", "报告链接", "研报摘要"]
+        self.csv_index = ["股票代码", "券商简称", "发布日期", "研报标题", "报告链接", "研报摘要"]
         self.saving_path = saving_path
+        self.proxies = proxies
 
     def process_url_from_files(self):
         """从文件中获取URL，重新执行爬取"""
@@ -82,7 +108,7 @@ class DateProcesser:
             while True:
                 new_url = re.sub(r'(&p=)\d+', r'\g<1>' + str(pageNum), url)
                 print(f"开始：{new_url}")
-                parsed_html = scrape_page(new_url, HEADERS)
+                parsed_html = scrape_page(new_url, HEADERS, self.proxies)
                 is_final_page = parsed_html.xpath(
                     '//table[@class="tb_01"]/tr')
                 if len(is_final_page) == 3:
@@ -156,22 +182,18 @@ class DateProcesser:
             print(f"\t不是个股文件：{type}\t{title}")
             return
         # 从标题中获取代码、简称和文章题目
-        shortName, ids, headline = get_id_and_name(title)
-        # 有些证券公司总喜欢搞些奇怪的格式
-        if shortName is None:
-            print(f"\t标题格式不正确：{type}\t{title}")
-            return
+        ids = find_stock_code(title)
         # 组成文件的简称
-        file_short_name = f"{ids}_{broker}_{shortName}_{self.reportDate}"
+        file_short_name = f"{ids}_{broker}_{self.reportDate}"
         # 组成文件在表中的列表
         csv_info_list = [ids, broker, self.reportDate,
-                         shortName, headline, url, []]
+                         title, url, []]
         # 如果主键已经存在在文件中，则跳过
         if url in urls:
             print(f"{file_short_name}：已存在，跳过")
             return
         # 获取文件内容
-        csv_info_list[6] = get_file_content(url)
+        csv_info_list[5] = get_file_content(url, self.proxies)
         # 追加文件
         saving_file = f"{self.saving_path}\{self.reportDate[:7]}.csv"
         df = pd.DataFrame([csv_info_list], columns=self.csv_index)
@@ -189,40 +211,6 @@ def retry_on_failure(func):
         print(f'Error, 暂停 {pause_time} 秒')
         time.sleep(pause_time)
         return retry_on_failure(func)
-
-
-def get_id_and_name(title: str) -> tuple:
-    """从研报标题中提取代码、简称和文章题目"""
-    left_parenthesis_index = title.find('(')
-    left_parenthesis_index_2 = title.find('-')
-    if left_parenthesis_index != -1:
-        # 提取左括号左边的内容作为简称
-        short_name = title[:left_parenthesis_index]
-
-        # 找到右括号的位置
-        right_parenthesis_index = title.find(')', left_parenthesis_index)
-        if right_parenthesis_index != -1:
-            # 提取括号内的内容作为代码
-            code = title[left_parenthesis_index + 1:right_parenthesis_index]
-            if re.match(r'^\d{6}$', code):
-                # 如果是六个数字，则保留 code，否则设为 None
-                pass
-            else:
-                code = None
-            code = str(code)
-            # 提取括号右边的部分作为标题
-        else:
-            code = None
-            title = None
-    elif left_parenthesis_index_2 != -1:
-        short_name = title[:left_parenthesis_index_2]
-        code = None
-    else:
-        short_name = None
-        code = None
-        title = None
-
-    return short_name, str(code), title
 
 
 def create_date_intervals(start_date="2000-01-01", end_date=None) -> list:
@@ -244,11 +232,11 @@ def create_date_intervals(start_date="2000-01-01", end_date=None) -> list:
     return date_intervals
 
 
-def get_file_content(url):
+def get_file_content(url, proxies):
     repeat_times = 1
     while True:
         file_content = retry_on_failure(lambda:
-                                        requests.get(url, headers=HEADERS).text)
+                                        requests.get(url, headers=HEADERS, proxies=proxies).text)
         time.sleep(random.uniform(0.5, 1.5))
         file_content = etree.HTML(file_content).xpath(
             '//div[@class="blk_container"]/p/text()')
