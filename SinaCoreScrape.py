@@ -45,7 +45,7 @@ def unpack_and_standarise_response(parsed_html):
     return file_info
 
 
-df = pd.read_excel(r"basicInfo.xlsx", header=None, names=[
+df = pd.read_excel(r"scrape-sina-broker-report\basicInfo.xlsx", header=None, names=[
     "stock_code", "company_name"])
 name_to_code = df.set_index('company_name')['stock_code'].to_dict()
 
@@ -147,7 +147,7 @@ class DateProcesser:
         urls = [str(row["报告链接"])
                 for index, row in df.iterrows()]
         URL = f'https://stock.finance.sina.com.cn/stock/go.php/vReport_List/kind/search/index.phtml?t1=6&symbol=&p={pageNum}&pubdate={self.reportDate}'
-        parsed_html = scrape_page(URL, HEADERS)
+        parsed_html = scrape_page(URL, HEADERS, self.proxies)
         is_final_page = parsed_html.xpath(
             '//table[@class="tb_01"]/tr')
         if len(is_final_page) == 3:
