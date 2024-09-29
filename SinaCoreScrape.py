@@ -12,6 +12,19 @@ HEADERS = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0',
 }
+TYPES = {
+    "个股": ["公司", "创业板"],
+    "行业": ["行业"],
+    "策略": ["策略"],
+    "宏观": ["宏观"],
+    "基金": ["基金"],
+    "债券": ["债券"],
+}
+
+
+df = pd.read_excel(r"scrape-sina-broker-report\basicInfo.xlsx", header=None, names=[
+    "stock_code", "company_name"])
+name_to_code = df.set_index('company_name')['stock_code'].to_dict()
 
 
 def scrape_page(URL, HEADERS, proxies):
@@ -45,11 +58,6 @@ def unpack_and_standarise_response(parsed_html):
     return file_info
 
 
-df = pd.read_excel(r"scrape-sina-broker-report\basicInfo.xlsx", header=None, names=[
-    "stock_code", "company_name"])
-name_to_code = df.set_index('company_name')['stock_code'].to_dict()
-
-
 def find_stock_code(input_string):
     # 读取Excel文件
     # 查找股票代码模式
@@ -79,7 +87,7 @@ class DateProcesser:
                           "研报标题", "报告链接", "研报文本", "研究员"]
         self.saving_path = saving_path
         self.proxies = proxies
-        self.report_types = report_types
+        self.report_types = TYPES[report_types]
 
     def process_url_from_files(self):
         """从文件中获取URL，重新执行爬取"""
@@ -181,11 +189,13 @@ class DateProcesser:
         (url, title, type, broker, researcher) = files
         # 跳过不是个股研究的报告
         if type not in self.report_types:
-            print(f"\t不是个股文件：{type}\t{title}")
+            print(f"\t不是{self.report_types}文件：{type}\t{title}")
             return
         # 从标题中获取代码、简称和文章题目
-        ids = find_stock_code(title)
-        # 组成文件的简称
+        if type in ["公司", "创业板"]:
+            ids = find_stock_code(title)
+        else:
+            ids = type
         file_short_name = f"{ids}_{broker}_{self.reportDate}"
         # 组成文件在表中的列表
         csv_info_list = [ids, broker, self.reportDate,
@@ -257,21 +267,23 @@ def get_file_content(url, proxies):
 
 # ######################################################
 # """此处为需要修改的代码"""
-# start_date = "2000-01-01"
-# end_date = "2023-11-11"  # None # "2023-09-09"
-# records_txt = r"E:\[待整理]Source_for_sale\券商研报\已下载记录.txt"
+# start_date = "2000-06-01"  # "2004-06-01"
+# end_date = None  # None # "2023-09-09"
+# records_txt = r"N:\Source_for_sale\分析师研报\个股报告\已下载记录.txt"
 # get_url_from_file = 0
-# saving_path = r"E:\[待整理]Source_for_sale\券商研报\新浪研报"
+# saving_path = r"N:\Source_for_sale\分析师研报"
+# report_type = "个股"
+# saving_path = rf"N:\Source_for_sale\分析师研报\分析师{report_type}报告"
 
 # ######################################################
 # if __name__ == "__main__":
 #     if get_url_from_file == 1:
 #         DateProcesser("2000-01-01", records_txt,
-#                       saving_path).process_url_from_files()
+#                       saving_path, proxies).process_url_from_files()
 #     else:
-#         for Times in create_date_intervals(start_date, end_date):
+#         for Times in create_date_intervals(start_date, end_date)[::-1]:
 #             page = 1
 #             while True:
-#                 if DateProcesser(Times, records_txt, saving_path).process_page_for_downloads(page) == False:
+#                 if DateProcesser(Times, records_txt, saving_path, report_type, proxies).process_page_for_downloads(page) == False:
 #                     break
 #                 page += 1
