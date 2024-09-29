@@ -7,7 +7,7 @@ import pandas as pd
 from lxml import etree
 import random
 import datetime
-
+from tqdm import tqdm
 HEADERS = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0',
@@ -18,7 +18,7 @@ def scrape_page(URL, HEADERS, proxies):
     """爬取代码封装"""
     result = retry_on_failure(
         lambda: requests.get(URL, headers=HEADERS, proxies=proxies).text)
-    time.sleep(random.uniform(0.5, 1.5))
+    # time.sleep(random.uniform(0.5, 1.5))
     parsed_html = etree.HTML(result)
     return parsed_html
 
@@ -72,12 +72,14 @@ def find_stock_code(input_string):
 
 
 class DateProcesser:
-    def __init__(self, reportDate, records_txt, saving_path, proxies={}):
+    def __init__(self, reportDate, records_txt, saving_path, report_types, proxies={}):
         self.reportDate = reportDate
         self.records_txt = records_txt
-        self.csv_index = ["股票代码", "券商简称", "发布日期", "研报标题", "报告链接", "研报摘要"]
+        self.csv_index = ["股票代码", "券商简称", "发布日期",
+                          "研报标题", "报告链接", "研报文本", "研究员"]
         self.saving_path = saving_path
         self.proxies = proxies
+        self.report_types = report_types
 
     def process_url_from_files(self):
         """从文件中获取URL，重新执行爬取"""
@@ -178,7 +180,7 @@ class DateProcesser:
         """分块下载文件"""
         (url, title, type, broker, researcher) = files
         # 跳过不是个股研究的报告
-        if type not in ["公司", "创业板"]:
+        if type not in self.report_types:
             print(f"\t不是个股文件：{type}\t{title}")
             return
         # 从标题中获取代码、简称和文章题目
@@ -187,7 +189,7 @@ class DateProcesser:
         file_short_name = f"{ids}_{broker}_{self.reportDate}"
         # 组成文件在表中的列表
         csv_info_list = [ids, broker, self.reportDate,
-                         title, url, []]
+                         title, url, [], researcher]
         # 如果主键已经存在在文件中，则跳过
         if url in urls:
             print(f"{file_short_name}：已存在，跳过")
@@ -208,8 +210,8 @@ def retry_on_failure(func):
         result = func()
         return result
     except:
-        print(f'Error, 暂停 {pause_time} 秒')
-        time.sleep(pause_time)
+        tqdm.write(f'Error, 暂停 {pause_time} 秒')
+        # time.sleep(pause_time)
         return retry_on_failure(func)
 
 
@@ -237,9 +239,9 @@ def get_file_content(url, proxies):
     while True:
         file_content = retry_on_failure(lambda:
                                         requests.get(url, headers=HEADERS, proxies=proxies).text)
-        time.sleep(random.uniform(0.5, 1.5))
+        # time.sleep(random.uniform(0.5, 1.5))
         file_content = etree.HTML(file_content).xpath(
-            '//div[@class="blk_container"]/p/text()')
+            '//div[@class="blk_container"]/p//text()')
         file_content = [f.strip() for f in file_content]
         file_content = "\n".join(file_content)
         if file_content or repeat_times > 10:
@@ -247,7 +249,7 @@ def get_file_content(url, proxies):
         else:
             t = random.uniform(2, 5) * repeat_times
             print(f"{url} 为空，暂停 {t} 秒")
-            time.sleep(t)
+            # time.sleep(t)
             repeat_times += 1
     print(f"{file_content[:50]}…………")
     return file_content
