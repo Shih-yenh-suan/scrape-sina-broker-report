@@ -32,7 +32,7 @@ def scrape_page(URL, HEADERS, proxies):
     """爬取代码封装"""
     result = retry_on_failure(
         lambda: requests.get(URL, headers=HEADERS, proxies=proxies).text)
-    # time.sleep(random.uniform(0.5, 1.5))
+    time.sleep(random.uniform(0.5, 1.5))
     parsed_html = etree.HTML(result)
     return parsed_html
 
@@ -222,7 +222,7 @@ def retry_on_failure(func):
         return result
     except:
         tqdm.write(f'Error, 暂停 {pause_time} 秒')
-        # time.sleep(pause_time)
+        time.sleep(pause_time)
         return retry_on_failure(func)
 
 
@@ -250,7 +250,7 @@ def get_file_content(url, proxies):
     while True:
         file_content = retry_on_failure(lambda:
                                         requests.get(url, headers=HEADERS, proxies=proxies).text)
-        # time.sleep(random.uniform(0.5, 1.5))
+        time.sleep(random.uniform(0.5, 1.5))
         file_content = etree.HTML(file_content).xpath(
             '//div[@class="blk_container"]/p//text()')
         file_content = [f.strip() for f in file_content]
@@ -260,7 +260,7 @@ def get_file_content(url, proxies):
         else:
             t = random.uniform(2, 5) * repeat_times
             print(f"{url} 为空，暂停 {t} 秒")
-            # time.sleep(t)
+            time.sleep(t)
             repeat_times += 1
     print(f"{file_content[:50]}…………")
     return file_content

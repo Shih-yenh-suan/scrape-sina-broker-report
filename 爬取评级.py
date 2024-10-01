@@ -15,7 +15,7 @@ HEADERS = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0',
 }
-SAVEPATH = r"E:\[待整理]Source_for_sale\分析师研报\个股评级"
+SAVEPATH = r"N:\Source_for_sale\分析师研报\个股评级"
 
 
 def get_proxies():
@@ -44,16 +44,19 @@ def retry_on_failure(func):
 
 
 def main():
-    with open('scrape-sina-broker-report\list-A.txt', 'r') as f:
-        symbols = [l.strip() for l in f.readlines()]
-    for s in symbols:
-        print(f'{s}：开始')
-        get(s)
-    # with ThreadPoolExecutor() as executor:
-    #     futures = [executor.submit(get, s)
-    #                for s in symbols]
-    #     for future in as_completed(futures):
-    #         future.result()  # 获取结果，以捕获异常
+    df = pd.read_excel(r"scrape-sina-broker-report\basicInfo.xlsx", header=None, names=[
+        "stock_code", "company_name"])
+    name_to_code = df.set_index('company_name')['stock_code'].to_dict()
+    symbols = set(name_to_code.values())
+
+    # for s in symbols:
+    #     print(f'{s}：开始')
+    #     get(s)
+    with ThreadPoolExecutor() as executor:
+        futures = [executor.submit(get, s)
+                   for s in symbols]
+        for future in as_completed(futures):
+            future.result()  # 获取结果，以捕获异常
 
 
 def get(symbol):
@@ -106,7 +109,6 @@ def get(symbol):
     table = [list(row) for row in zip(*table)]
     df = pd.DataFrame(table, columns=index)
     df = df[df["股票代码"] == symbol]
-
     save_df(symbol, df)
 
 
