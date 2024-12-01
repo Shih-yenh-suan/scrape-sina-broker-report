@@ -81,69 +81,13 @@ def find_stock_code(input_string):
 
 
 class DateProcesser:
-    def __init__(self, reportDate, records_txt, saving_path, report_types, proxies={}):
+    def __init__(self, reportDate, saving_path, report_types, proxies={}):
         self.reportDate = reportDate
-        self.records_txt = records_txt
         self.csv_index = ["股票代码", "券商简称", "发布日期",
                           "研报标题", "报告链接", "研报文本", "研究员"]
         self.saving_path = saving_path
         self.proxies = proxies
         self.report_types = TYPES[report_types]
-
-    def process_url_from_files(self):
-        """从文件中获取URL，重新执行爬取"""
-        # 检查记录文件是否存在，不存在则创建
-        if not os.path.exists(self.records_txt):
-            with open(self.records_txt, 'w') as file:
-                pass
-        # 循环读取文件的第一行，以实现爬取一个删除一个。
-        while True:
-            with open(self.records_txt, 'r', encoding='utf-8', errors='ignore') as f:
-                records = f.readlines()
-            # 如果没有行，则跳出
-            if not records:
-                print(f"全部记录已重新爬取")
-                break
-            record = records[0]
-            url = record.split(',')[0]
-            reportDate = record.split(',')[1].rstrip()
-            self.reportDate = reportDate
-            saving_file = f"{self.saving_path}\{self.reportDate[:7]}.csv"
-            df = pd.read_csv(saving_file, encoding='utf-8-sig',
-                             encoding_errors="ignore", dtype=str)
-            urls = [str(row["报告链接"])
-                    for index, row in df.iterrows()]
-            # 修改 url，从 url提供的数字开始，向上 +1，循环爬取
-            match = re.search(r"&p=(\d+)&", url)
-            pageNum = int(match.group(1))
-            while True:
-                new_url = re.sub(r'(&p=)\d+', r'\g<1>' + str(pageNum), url)
-                print(f"开始：{new_url}")
-                parsed_html = scrape_page(new_url, HEADERS, self.proxies)
-                is_final_page = parsed_html.xpath(
-                    '//table[@class="tb_01"]/tr')
-                if len(is_final_page) == 3:
-                    tr_length = len(parsed_html.xpath(
-                        '//table[@class="tb_01"]/tr[3]/td'))
-                    if tr_length == 1:
-                        print(
-                            f"第 {pageNum} 页无内容：{len(is_final_page)}, {new_url}")
-                        break
-                elif len(is_final_page) == 0:
-                    # 为0说明爬取错误了，直接退出，同时更新链接
-                    with open(self.records_txt, 'w', encoding='utf-8', errors='ignore') as file:
-                        file.writelines(f"{new_url},{reportDate}\n")
-                        file.writelines(records[1:])
-                    print(f"第 {pageNum} 页错误：{len(is_final_page)}, {new_url}")
-                    return
-                file_info = unpack_and_standarise_response(parsed_html)
-                for files in file_info:
-                    self.download_file(files, urls)
-                pageNum += 1
-            # 处理完成后，从记录中移除当前URL，也就是不将当前URL加回去
-            with open(self.records_txt, 'w', encoding='utf-8', errors='ignore') as file:
-                file.writelines(records[1:])
-            print(f"已从记录中删除：{url}")
 
     def process_page_for_downloads(self, pageNum: int):
         """处理指定页码的公告信息并下载相关文件"""
