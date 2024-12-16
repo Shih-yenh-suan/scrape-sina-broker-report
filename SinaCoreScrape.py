@@ -85,11 +85,11 @@ class DateProcesser:
         self.reportDate = reportDate
         self.csv_index = ["股票代码", "券商简称", "发布日期",
                           "研报标题", "报告链接", "研报文本", "研究员"]
-        self.saving_path = saving_path
+        self.saving_path = f"{saving_path}\分析师{report_types}报告"
         self.proxies = proxies
         self.report_types = TYPES[report_types]
 
-    def process_page_for_downloads(self, pageNum: int):
+    def process_page_for_downloads(self):
         """处理指定页码的公告信息并下载相关文件"""
         # 持久化存储
         saving_file = f"{self.saving_path}\{self.reportDate[:7]}.csv"
@@ -101,40 +101,24 @@ class DateProcesser:
                          encoding_errors="ignore", dtype=str)
         urls = [str(row["报告链接"])
                 for index, row in df.iterrows()]
-        URL = f'https://stock.finance.sina.com.cn/stock/go.php/vReport_List/kind/search/index.phtml?t1=6&symbol=&p={pageNum}&pubdate={self.reportDate}'
-        parsed_html = scrape_page(URL, HEADERS, self.proxies)
-        is_final_page = parsed_html.xpath(
-            '//table[@class="tb_01"]/tr')
-        if len(is_final_page) == 3:
-            tr_length = len(parsed_html.xpath(
-                '//table[@class="tb_01"]/tr[3]/td'))
-            if tr_length == 1:
-                # 刚好为3行，且只有一列的时候，是无内容的
-                print(f"第 {pageNum} 页开始，可能是最后一页：{URL}")
-                file_info = unpack_and_standarise_response(parsed_html)
-                for files in file_info:
-                    self.download_file(files, urls)
-                print("==" * 10 +
-                      f"{self.reportDate} 日第 {pageNum} 页：已完成" + "==" * 10)
-                return False
-        elif len(is_final_page) == 0:
-            # 为0说明爬取错误了，记下来。
-            print(f"第 {pageNum} 页错误：{len(is_final_page)}, {URL}")
-            with open(self.records_txt, 'a', encoding='utf-8', errors='ignore') as f:
-                f.write(f'{URL},{self.reportDate}\n')
-            return False
-        print(f"第 {pageNum} 页开始：{URL}")
-        file_info = unpack_and_standarise_response(parsed_html)
-        for files in file_info:
-            self.download_file(files, urls)
-        print("==" * 10 + f"{self.reportDate} 日第 {pageNum} 页：已完成" + "==" * 10)
+        first_url = f'https://stock.finance.sina.com.cn/stock/go.php/vReport_List/kind/search/index.phtml?t1=6&symbol=&p=1&pubdate={self.reportDate}'
+        parsed_html_first = scrape_page(first_url, HEADERS, self.proxies)
+        total_pages = parsed_html_first.xpath(
+            '//a[text()="最末页"]/@onclick')[0].split("set_page_num(\'")[1].split("\')")[0]
+        total_pages = int(total_pages)
+        for pageNum in tqdm(range(total_pages), desc=f"{self.reportDate}"):
+            URL = f'https://stock.finance.sina.com.cn/stock/go.php/vReport_List/kind/search/index.phtml?t1=6&symbol=&p={pageNum + 1}&pubdate={self.reportDate}'
+            parsed_html = scrape_page(URL, HEADERS, self.proxies)
+            file_info = unpack_and_standarise_response(parsed_html)
+            for files in file_info:
+                self.download_file(files, urls)
 
     def download_file(self, files, urls):
         """分块下载文件"""
         (url, title, type, broker, researcher) = files
         # 跳过不是个股研究的报告
         if type not in self.report_types:
-            print(f"\t不是{self.report_types}文件：{type}\t{title}")
+            # tqdm.write(f"\t不是{self.report_types}文件：{type}\t{title}")
             return
         # 从标题中获取代码、简称和文章题目
         if type in ["公司", "创业板"]:
@@ -147,7 +131,7 @@ class DateProcesser:
                          title, url, [], researcher]
         # 如果主键已经存在在文件中，则跳过
         if url in urls:
-            print(f"{file_short_name}：已存在，跳过")
+            tqdm.write(f"\t{file_short_name}：已存在，跳过")
             return
         # 获取文件内容
         csv_info_list[5] = get_file_content(url, self.proxies)
@@ -155,7 +139,7 @@ class DateProcesser:
         saving_file = f"{self.saving_path}\{self.reportDate[:7]}.csv"
         df = pd.DataFrame([csv_info_list], columns=self.csv_index)
         df.to_csv(saving_file, mode='a', header=False, index=False)
-        print(f"{file_short_name}：已保存")
+        tqdm.write(f"{file_short_name}：已保存")
 
 
 def retry_on_failure(func):
@@ -164,8 +148,8 @@ def retry_on_failure(func):
     try:
         result = func()
         return result
-    except:
-        tqdm.write(f'Error, 暂停 {pause_time} 秒')
+    except Exception as e:
+        tqdm.write(f'Error, {e}')
         time.sleep(pause_time)
         return retry_on_failure(func)
 
@@ -203,32 +187,22 @@ def get_file_content(url, proxies):
             break
         else:
             t = random.uniform(2, 5) * repeat_times
-            print(f"{url} 为空，暂停 {t} 秒")
+            tqdm.write(f"{url} 为空，暂停 {t} 秒")
             time.sleep(t)
             repeat_times += 1
-    print(f"{file_content[:50]}…………")
+    # tqdm.write(f"{file_content[:30]}…………")
     return file_content
 
 
-# ######################################################
+# #####################################################
 # """此处为需要修改的代码"""
-# start_date = "2000-06-01"  # "2004-06-01"
+# start_date = "2004-06-01"  # "2004-06-01"
 # end_date = None  # None # "2023-09-09"
-# records_txt = r"N:\Source_for_sale\分析师研报\个股报告\已下载记录.txt"
-# get_url_from_file = 0
 # saving_path = r"N:\Source_for_sale\分析师研报"
-# report_type = "个股"
-# saving_path = rf"N:\Source_for_sale\分析师研报\分析师{report_type}报告"
+# report_type = "策略"
 
 # ######################################################
 # if __name__ == "__main__":
-#     if get_url_from_file == 1:
-#         DateProcesser("2000-01-01", records_txt,
-#                       saving_path, proxies).process_url_from_files()
-#     else:
-#         for Times in create_date_intervals(start_date, end_date)[::-1]:
-#             page = 1
-#             while True:
-#                 if DateProcesser(Times, records_txt, saving_path, report_type, proxies).process_page_for_downloads(page) == False:
-#                     break
-#                 page += 1
+#     for Times in create_date_intervals(start_date, end_date)[::-1]:
+#         if DateProcesser(Times, saving_path, report_type, proxies={}).process_page_for_downloads() == False:
+#             break
