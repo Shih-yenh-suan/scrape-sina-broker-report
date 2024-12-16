@@ -32,7 +32,6 @@ def scrape_page(URL, HEADERS, proxies):
     """爬取代码封装"""
     result = retry_on_failure(
         lambda: requests.get(URL, headers=HEADERS, proxies=proxies).text)
-    time.sleep(random.uniform(0.5, 1.5))
     parsed_html = etree.HTML(result)
     return parsed_html
 
@@ -178,7 +177,6 @@ def get_file_content(url, proxies):
     while True:
         file_content = retry_on_failure(lambda:
                                         requests.get(url, headers=HEADERS, proxies=proxies).text)
-        time.sleep(random.uniform(0.5, 1.5))
         file_content = etree.HTML(file_content).xpath(
             '//div[@class="blk_container"]/p//text()')
         file_content = [f.strip() for f in file_content]
