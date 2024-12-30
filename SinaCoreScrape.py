@@ -86,6 +86,18 @@ class DateProcesser:
         self.proxies = proxies
 
     def process_page_for_downloads(self):
+        exist_urls = []
+        tqdm.write(f"开始处理{self.reportDate}，合并日期中……")
+        for dt in ["行业", "个股", "债券", "策略", "晨报", "基金", "宏观"]:
+            saving_file = f"{self.saving_path}\分析师{dt}报告\{self.reportDate[:7]}.csv"
+            if not os.path.exists(saving_file):
+                df = pd.DataFrame(columns=self.csv_index)
+                df.to_csv(saving_file, index=False)
+            df = pd.read_csv(saving_file, encoding='utf-8-sig',
+                             encoding_errors="ignore", dtype=str)
+            exist_urls += [str(row["报告链接"])
+                           for index, row in df.iterrows()]
+
         """处理指定页码的公告信息并下载相关文件"""
         first_url = f'https://stock.finance.sina.com.cn/stock/go.php/vReport_List/kind/search/index.phtml?t1=6&symbol=&p=1&pubdate={self.reportDate}'
         parsed_html_first = scrape_page(first_url, HEADERS, self.proxies)
@@ -102,9 +114,9 @@ class DateProcesser:
             parsed_html = scrape_page(URL, HEADERS, self.proxies)
             file_info = unpack_and_standarise_response(parsed_html)
             for files in file_info:
-                self.download_file(files)
+                self.download_file(files, exist_urls)
 
-    def download_file(self, files):
+    def download_file(self, files, exist_urls):
         """分块下载文件"""
         (file_id, url, title, type, broker, researcher) = files
         file_short_name = f"{file_id}_{broker}_{self.reportDate}"
@@ -118,7 +130,7 @@ class DateProcesser:
         else:
             self.customerized_type = self.customerized_type
         if type not in self.customerized_type:
-            # tqdm.write(f"\t{file_short_name}：不属于指定的报告类型")
+            tqdm.write(f"\t{file_short_name}：不属于指定的报告类型")
             return
 
         # 指定下载文件夹
@@ -132,12 +144,8 @@ class DateProcesser:
         if not os.path.exists(saving_file):
             df = pd.DataFrame(columns=self.csv_index)
             df.to_csv(saving_file, index=False)
-        df = pd.read_csv(saving_file, encoding='utf-8-sig',
-                         encoding_errors="ignore", dtype=str)
-        urls = [str(row["报告链接"])
-                for index, row in df.iterrows()]
-        if url in urls:
-            tqdm.write(f"\t{file_short_name}：已存在，跳过")
+        if url in exist_urls:
+            # tqdm.write(f"\t{file_short_name}：已存在，跳过")
             return
 
         # 组成文件在表中的列表
